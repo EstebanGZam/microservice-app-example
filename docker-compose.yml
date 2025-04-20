@@ -21,7 +21,7 @@ services:
       - JWT_SECRET=PRFT
       - SERVER_PORT=8083
       - SPRING_PROFILES_ACTIVE=default
-      - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      - ZIPKIN_URL=http://zipkin:9411/
     expose:
       - 8083
     depends_on:
@@ -74,6 +74,8 @@ services:
       - REDIS_PORT=6379
       - REDIS_CHANNEL=log_channel
       - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+    expose:
+      - 8081
     depends_on:
       - redis
     networks:
