@@ -92,11 +92,22 @@ services:
       - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
       - JWT_SECRET=PRFT
     expose:
-      - 8080
+      - 8081
     depends_on:
       - auth-api
       - todos-api
       - users-api
+    networks:
+      - microservices-network
+  
+  frontend-exporter:
+    image: nginx/nginx-prometheus-exporter:0.11.0
+    command:
+      - -nginx.scrape-uri=http://frontend:8081/nginx_status
+    expose:
+      - 9113 # Port where the exporter displays the metrics
+    depends_on:
+      - frontend
     networks:
       - microservices-network
 
@@ -109,10 +120,10 @@ services:
       - "./prometheus/data:/prometheus"  # Data directory for Prometheus
     ports:
       - "9090:9090"
-    networks:
-      - microservices-network
     depends_on:
       - frontend
+    networks:
+      - microservices-network
 
   # Grafana Service for visualization
   grafana:

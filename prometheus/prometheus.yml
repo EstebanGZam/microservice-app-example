@@ -18,3 +18,7 @@ scrape_configs:
   - job_name: "log-message-processor"
     static_configs:
       - targets: ["log-message-processor:8081"]
+
+  - job_name: "frontend-nginx"
+    static_configs:
+      - targets: ["frontend-exporter:9113"]
