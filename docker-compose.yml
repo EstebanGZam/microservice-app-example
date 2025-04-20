@@ -3,6 +3,8 @@ services:
     image: openzipkin/zipkin
     ports:
       - "9411:9411"
+    expose:
+      - 9411
     networks:
       - microservices-network
 
@@ -113,13 +115,19 @@ services:
 
   # Prometheus Service for monitoring
   prometheus:
-    image: prom/prometheus
-    user: "65534"  # User ID for non-root user
+    build:
+      context: ./prometheus
+    user: "65534" # ID for non-root user
     volumes:
-      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"  # Config file for Prometheus
-      - "./prometheus/data:/prometheus"  # Data directory for Prometheus
+      - ./prometheus/data:/prometheus
     ports:
       - "9090:9090"
+    environment:
+      AUTH_API_TARGET: "auth-api:8000"
+      USERS_API_TARGET: "users-api:8083"
+      TODOS_API_TARGET: "todos-api:8082"
+      LOG_PROCESSOR_TARGET: "log-message-processor:8081"
+      FRONTEND_EXPORTER_TARGET: "frontend-exporter:9113"
     depends_on:
       - frontend
     networks:
@@ -138,6 +146,8 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+    expose:
+      - 3000
     networks:
       - microservices-network
 
