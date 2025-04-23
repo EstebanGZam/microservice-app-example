@@ -30,9 +30,8 @@ module "container_apps_environment" {
   resource_group_name = module.resource_group.name
   location            = module.resource_group.location
   name                = var.container_apps_environment_name
-  # subnet_id           = module.network.subnet_id
-  tags       = var.tags
-  depends_on = [module.resource_group]
+  tags                = var.tags
+  depends_on          = [module.resource_group]
 }
 
 # Container Apps Modules
@@ -46,8 +45,8 @@ module "zipkin" {
   registry_server            = module.container_registry.login_server
   registry_username          = module.container_registry.admin_username
   registry_password          = module.container_registry.admin_password
-  cpu                        = 0.5
-  memory                     = "1Gi"
+  cpu                        = 1.0
+  memory                     = "2Gi"
   min_replicas               = 1
   max_replicas               = 3
   ingress_external           = true
@@ -68,12 +67,13 @@ module "redis" {
   registry_server            = module.container_registry.login_server
   registry_username          = module.container_registry.admin_username
   registry_password          = module.container_registry.admin_password
-  cpu                        = 0.5
-  memory                     = "1Gi"
+  cpu                        = 2.0
+  memory                     = "4Gi"
   min_replicas               = 1
   max_replicas               = 3
   ingress_external           = false
   ingress_target_port        = 6379
+  is_tcp                     = true
   environment_variables      = {}
   secrets                    = {}
   tags                       = var.tags
@@ -90,8 +90,8 @@ module "users_api" {
   registry_server            = module.container_registry.login_server
   registry_username          = module.container_registry.admin_username
   registry_password          = module.container_registry.admin_password
-  cpu                        = 0.5
-  memory                     = "1Gi"
+  cpu                        = 1.0
+  memory                     = "2Gi"
   min_replicas               = 1
   max_replicas               = 3
   ingress_external           = false
@@ -100,7 +100,7 @@ module "users_api" {
     "JWT_SECRET"             = "secretref:jwt-secret"
     "SERVER_PORT"            = "8083"
     "SPRING_PROFILES_ACTIVE" = "default"
-    "ZIPKIN_URL"             = "http://zipkin/api/v2/spans"
+    "ZIPKIN_URL"             = "http://zipkin/"
   }
 
   secrets = {
@@ -120,8 +120,8 @@ module "auth_api" {
   registry_server            = module.container_registry.login_server
   registry_username          = module.container_registry.admin_username
   registry_password          = module.container_registry.admin_password
-  cpu                        = 0.5
-  memory                     = "1Gi"
+  cpu                        = 1.0
+  memory                     = "2Gi"
   min_replicas               = 1
   max_replicas               = 3
   ingress_external           = false
@@ -136,7 +136,7 @@ module "auth_api" {
     "jwt-secret" = var.jwt_secret
   }
   tags       = var.tags
-  depends_on = [module.container_apps_environment, module.users_api]
+  depends_on = [module.container_apps_environment, module.redis, module.users_api]
 }
 
 module "todos_api" {
@@ -149,8 +149,8 @@ module "todos_api" {
   registry_server            = module.container_registry.login_server
   registry_username          = module.container_registry.admin_username
   registry_password          = module.container_registry.admin_password
-  cpu                        = 0.5
-  memory                     = "1Gi"
+  cpu                        = 1.0
+  memory                     = "2Gi"
   min_replicas               = 1
   max_replicas               = 3
   ingress_external           = false
@@ -171,7 +171,7 @@ module "todos_api" {
   depends_on = [module.container_apps_environment, module.redis, module.users_api]
 }
 
-module "log_processor" {
+module "log_message_processor" {
   source                     = "./modules/container_apps"
   resource_group_name        = module.resource_group.name
   location                   = module.resource_group.location
@@ -181,8 +181,8 @@ module "log_processor" {
   registry_server            = module.container_registry.login_server
   registry_username          = module.container_registry.admin_username
   registry_password          = module.container_registry.admin_password
-  cpu                        = 0.5
-  memory                     = "1Gi"
+  cpu                        = 2.0
+  memory                     = "4Gi"
   min_replicas               = 1
   max_replicas               = 3
   ingress_external           = false
@@ -209,8 +209,8 @@ module "frontend" {
   registry_server            = module.container_registry.login_server
   registry_username          = module.container_registry.admin_username
   registry_password          = module.container_registry.admin_password
-  cpu                        = 0.5
-  memory                     = "1Gi"
+  cpu                        = 1.0
+  memory                     = "2Gi"
   min_replicas               = 1
   max_replicas               = 3
   ingress_external           = true
@@ -226,5 +226,80 @@ module "frontend" {
     "jwt-secret" = var.jwt_secret
   }
   tags       = var.tags
-  depends_on = [module.container_apps_environment, module.auth_api, module.todos_api]
+  depends_on = [module.container_apps_environment, module.auth_api, module.todos_api, module.users_api]
+}
+
+module "frontend_exporter" {
+  source                     = "./modules/container_apps"
+  resource_group_name        = module.resource_group.name
+  location                   = module.resource_group.location
+  container_app_name         = "frontend-exporter"
+  container_apps_environment = module.container_apps_environment.name
+  image                      = "nginx/nginx-prometheus-exporter:latest"
+  registry_server            = module.container_registry.login_server
+  registry_username          = module.container_registry.admin_username
+  registry_password          = module.container_registry.admin_password
+  cpu                        = 1.0
+  memory                     = "2Gi"
+  min_replicas               = 1
+  max_replicas               = 3
+  ingress_external           = false
+  ingress_target_port        = 9113
+  environment_variables      = {}
+  secrets                    = {}
+  command                    = ["/usr/bin/nginx-prometheus-exporter"]
+  args                       = ["--nginx.scrape-uri=http://frontend/nginx_status"]
+  tags                       = var.tags
+  depends_on                 = [module.container_apps_environment, module.frontend]
+}
+
+module "prometheus" {
+  source                     = "./modules/container_apps"
+  resource_group_name        = module.resource_group.name
+  location                   = module.resource_group.location
+  container_app_name         = "prometheus"
+  container_apps_environment = module.container_apps_environment.name
+  image                      = "${module.container_registry.login_server}/prometheus:latest"
+  registry_server            = module.container_registry.login_server
+  registry_username          = module.container_registry.admin_username
+  registry_password          = module.container_registry.admin_password
+  cpu                        = 1.0
+  memory                     = "2Gi"
+  min_replicas               = 1
+  max_replicas               = 1
+  ingress_external           = true
+  ingress_target_port        = 9090
+  environment_variables = {
+    "AUTH_API_TARGET"          = "auth-api"
+    "USERS_API_TARGET"         = "users-api"
+    "TODOS_API_TARGET"         = "todos-api"
+    "LOG_PROCESSOR_TARGET"     = "log-message-processor"
+    "FRONTEND_EXPORTER_TARGET" = "frontend-exporter"
+  }
+  depends_on = [module.container_apps_environment, module.auth_api, module.users_api, module.todos_api, module.log_message_processor, module.frontend]
+  tags       = var.tags
+}
+
+module "grafana" {
+  source                     = "./modules/container_apps"
+  resource_group_name        = module.resource_group.name
+  location                   = module.resource_group.location
+  container_app_name         = "grafana"
+  container_apps_environment = module.container_apps_environment.name
+  image                      = "grafana/grafana:latest"
+  registry_server            = module.container_registry.login_server
+  registry_username          = module.container_registry.admin_username
+  registry_password          = module.container_registry.admin_password
+  cpu                        = 1.0
+  memory                     = "2Gi"
+  min_replicas               = 1
+  max_replicas               = 1
+  ingress_external           = true
+  ingress_target_port        = 3000
+  environment_variables = {
+    "GF_SECURITY_ADMIN_PASSWORD" = "12345",
+    "GF_PATHS_PROVISIONING"      = "/etc/grafana/provisioning"
+  }
+  depends_on = [module.container_apps_environment, module.prometheus]
+  tags       = var.tags
 }

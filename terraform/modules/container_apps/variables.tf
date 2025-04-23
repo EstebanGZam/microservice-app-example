@@ -81,6 +81,24 @@ variable "environment_variables" {
   default     = {}
 }
 
+variable "command" {
+  description = "Command override for the container"
+  type        = list(string)
+  default     = []
+}
+
+variable "is_tcp" {
+  description = "Is the container TCP?"
+  type        = bool
+  default     = false
+}
+
+variable "args" {
+  description = "Arguments for the container"
+  type        = list(string)
+  default     = []
+}
+
 variable "secrets" {
   description = "Secrets for the container"
   type        = map(string)

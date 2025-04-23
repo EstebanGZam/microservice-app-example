@@ -27,6 +27,8 @@ resource "azurerm_container_app" "app" {
           secret_name = env.value
         }
       }
+      command = length(var.command) > 0 ? var.command : null
+      args    = length(var.args) > 0 ? var.args : null
     }
 
     min_replicas = var.min_replicas
@@ -39,7 +41,7 @@ resource "azurerm_container_app" "app" {
     content {
       external_enabled = var.ingress_external
       target_port      = var.ingress_target_port
-      transport        = "auto"
+      transport        = var.is_tcp ? "tcp" : "auto"
 
       traffic_weight {
         latest_revision = true
@@ -48,7 +50,6 @@ resource "azurerm_container_app" "app" {
     }
   }
 
-  # Definición de secretos
   dynamic "secret" {
     for_each = var.secrets
     content {
